@@ -108,7 +108,8 @@ To change credentials:
 - `SignalRHealthUrl`: `http://localhost:8080/hubs/processing`
 
 #### UI Container
-- Built with production environment variables from `.env.production`
+
+- Built with production environment variables from `.env.production`, keeping browser requests on nginx via `/api` and `/hubs/processing`
 
 ### Volumes
 

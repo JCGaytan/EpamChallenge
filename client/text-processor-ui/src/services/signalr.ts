@@ -283,8 +283,24 @@ export class SignalRService {
 
 // Singleton instance
 const resolveSignalRUrl = (): string => {
-  if (process.env.REACT_APP_SIGNALR_URL && process.env.REACT_APP_SIGNALR_URL.trim().length > 0) {
-    return process.env.REACT_APP_SIGNALR_URL;
+  const rawValue = process.env.REACT_APP_SIGNALR_URL?.trim();
+
+  if (rawValue) {
+    if (rawValue.toLowerCase() === 'origin') {
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin.replace(/\/$/, '')}/hubs/processing`;
+      }
+      return '/hubs/processing';
+    }
+
+    if (rawValue.startsWith('/')) {
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin.replace(/\/$/, '')}${rawValue}`;
+      }
+      return rawValue;
+    }
+
+    return rawValue;
   }
 
   if (typeof window !== 'undefined' && window.location?.origin) {

@@ -3,8 +3,24 @@ import { ProcessingJob, ProcessTextRequest } from '../models/types';
 
 // Configuration
 const resolveApiBaseUrl = (): string => {
-  if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim().length > 0) {
-    return process.env.REACT_APP_API_URL.replace(/\/$/, '');
+  const rawValue = process.env.REACT_APP_API_URL?.trim();
+
+  if (rawValue) {
+    if (rawValue.toLowerCase() === 'origin') {
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return window.location.origin.replace(/\/$/, '');
+      }
+      return '';
+    }
+
+    if (rawValue.startsWith('/')) {
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin.replace(/\/$/, '')}${rawValue}`;
+      }
+      return rawValue;
+    }
+
+    return rawValue.replace(/\/$/, '');
   }
 
   if (typeof window !== 'undefined' && window.location?.origin) {
@@ -14,12 +30,20 @@ const resolveApiBaseUrl = (): string => {
   return 'https://localhost:7180';
 };
 
-const API_BASE_URL = resolveApiBaseUrl();
+const normalizeApiBaseUrl = (value: string): string => {
+  const trimmed = value.replace(/\/$/, '');
+  if (trimmed.endsWith('/api')) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl(resolveApiBaseUrl());
 const API_TIMEOUT = 30000; // 30 seconds
 
 // Create axios instance with default configuration
 const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',

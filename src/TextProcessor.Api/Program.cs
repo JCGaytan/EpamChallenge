@@ -201,9 +201,9 @@ static void MapEndpoints(WebApplication app)
                     status = x.Value.Status.ToString(),
                     description = x.Value.Description,
                     data = x.Value.Data,
-                    duration = x.Value.Duration.TotalMilliseconds
+                    duration = x.Value.Duration.ToString()
                 }),
-                totalDuration = report.TotalDuration.TotalMilliseconds,
+                totalDuration = report.TotalDuration.ToString(),
                 timestamp = DateTime.UtcNow
             };
 

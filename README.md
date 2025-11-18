@@ -69,6 +69,8 @@ Browse to `http://localhost:8080` (served by nginx). Tear the stack down with `d
 
 The compose stack launches the API, UI, and an nginx reverse proxy. nginx terminates basic auth, forwards `/api/*` and `/hubs/*` to the API with WebSocket upgrades for SignalR, and serves the built SPA for everything else using the config in `docker/nginx-proxy.conf`.
 
+The React build baked into the image uses `.env.production` so browser calls stay on the proxy origin (`/api` and `/hubs/processing`). Local development keeps targeting the Kestrel port via `.env.development`.
+
 ## Run the Tests
 
 - Full .NET suite (includes integration coverage for the cancellation workflow):

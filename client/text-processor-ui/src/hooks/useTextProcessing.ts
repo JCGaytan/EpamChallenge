@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import signalRService, { SignalRCallbacks } from '../services/signalr';
+import TextProcessingApi from '../services/api';
 import { 
   ProcessingJob, 
   CharacterProcessedEvent, 
@@ -247,9 +248,6 @@ export function useTextProcessing(): UseTextProcessingResult {
         throw new Error('Real-time connection is not ready');
       }
 
-      // Import API service dynamically to avoid circular dependencies
-      const { default: TextProcessingApi } = await import('../services/api');
-      
       const job = await TextProcessingApi.processText({ text }, effectiveConnectionId);
       
       setCurrentJob(job);
