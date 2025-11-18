@@ -1,0 +1,59 @@
+# OS artifacts
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE settings
+.vscode/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET build outputs
+bin/
+obj/
+out/
+artifacts/
+
+# Logs and diagnostics
+logs/
+**/logs/
+*.log
+*.nlog
+*.etl
+
+# Test and coverage data
+TestResults/
+*.trx
+*.coverage
+coverage/
+
+# Package managers
+**/packages/
+**/node_modules/
+
+# Frontend build outputs
+client/text-processor-ui/build/
+client/text-processor-ui/dist/
+client/text-processor-ui/.turbo/
+client/text-processor-ui/.next/
+
+# Environment files
+*.env
+*.env.local
+*.env.development
+*.env.production
+*.env.test
+
+# Tool caches
+.nuget/
+.pytest_cache/
+**/.eslintcache
+**/.cache/
+
+# Generated files
+wwwroot/
+**/wwwroot/
+*.generated.cs

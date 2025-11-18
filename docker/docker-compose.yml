@@ -1,0 +1,100 @@
+services:
+  # Text Processing API
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: textprocessor-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+      - SignalRHealthUrl=http://localhost:8080/hubs/processing
+    ports:
+      - "8080:8080"
+    networks:
+      - textprocessor-network
+    volumes:
+      - api-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # React Frontend
+  ui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ui
+    container_name: textprocessor-ui
+    ports:
+      - "3000:3000"
+    networks:
+      - textprocessor-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Nginx Reverse Proxy with Basic Auth
+  nginx:
+    image: nginx:alpine
+    container_name: textprocessor-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-proxy.conf:/etc/nginx/nginx.conf
+      - ./htpasswd:/etc/nginx/.htpasswd
+      - nginx-logs:/var/log/nginx
+    networks:
+      - textprocessor-network
+    depends_on:
+      - api
+      - ui
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Redis for production job storage (commented out for simplicity)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: textprocessor-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - textprocessor-network
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+networks:
+  textprocessor-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  api-logs:
+    driver: local
+  nginx-logs:
+    driver: local
+  # redis-data:
+  #   driver: local
