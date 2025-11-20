@@ -40,11 +40,8 @@ client/text-processor-ui/dist/
 client/text-processor-ui/.turbo/
 client/text-processor-ui/.next/
 
-# Environment files
-*.env
+# Environment files (keeping .env files tracked for challenge requirements)
 *.env.local
-*.env.development
-*.env.production
 *.env.test
 
 # Tool caches
