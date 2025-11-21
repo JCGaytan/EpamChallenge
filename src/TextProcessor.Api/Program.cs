@@ -134,7 +134,12 @@ static void ConfigurePipeline(WebApplication app)
         ConfigureSwagger(app);
     }
 
-    app.UseHttpsRedirection();
+    // Only use HTTPS redirection in production or when HTTPS is properly configured
+    if (!app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("UseHttpsRedirection", false))
+    {
+        app.UseHttpsRedirection();
+    }
+    
     app.UseSerilogRequestLogging(ConfigureRequestLogging);
     AddSecurityHeaders(app);
     app.UseMiddleware<MetricsMiddleware>();

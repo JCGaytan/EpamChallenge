@@ -4,7 +4,7 @@
 # Usage: ./generate-htpasswd.sh [username] [password]
 
 USERNAME=${1:-admin}
-PASSWORD=${2:-textprocessor2024}
+PASSWORD=${2:-textprocessor2025}
 
 echo "Generating htpasswd file for user: $USERNAME"
 

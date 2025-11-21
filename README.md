@@ -28,8 +28,16 @@ A .NET 9 + React application that demonstrates long-running text processing with
 
 1. The React SPA connects to the SignalR hub, caches the connection ID, and posts text to `/api/textprocessing/process` with that ID in `X-SignalR-ConnectionId`.
 2. The API creates a job for the owning connection, queues it with the background service, and streams state updates via SignalR.
-3. `TextProcessingService` produces the deterministic payload (`"<char><count>.../<base64>"`) while pushing `CharacterProcessed` events to the client.
+3. `TextProcessingService` produces the deterministic payload (`\"<char><count>.../<base64>\"`) while pushing `CharacterProcessed` events to the client.
 4. The hook-driven UI listens for progress, completion, cancellation, and failure events to keep the form state, EPAM-themed progress bar, and toast feedback synchronized.
+
+## Parallel Processing
+
+- **Multiple concurrent jobs**: The backend now supports up to 8 concurrent text processing jobs simultaneously (based on processor core count).
+- **Single tab limitation removed**: Each browser tab can now start multiple processing jobs without waiting for the previous one to complete.
+- **Multiple processes across tabs**: You can open multiple tabs or windows to run several processing jobs in parallel, as each tab gets its own SignalR connection and client ID.
+- **Secure isolation**: Jobs are isolated by connection ID, so cancellation and updates only affect the originating tab.
+- **Real-time updates**: Each job receives independent real-time progress updates through SignalR groups.
 
 ## Run It Locally
 
@@ -65,9 +73,29 @@ cd docker
 docker compose up --build -d
 ```
 
-Browse to `http://localhost:8080` (served by nginx). Tear the stack down with `docker compose down` when finished.
+Browse to `http://localhost` (served by nginx with authentication). The application requires HTTP Basic Authentication:
+
+- **Username:** `admin`
+- **Password:** `textprocessor2025`
+
+Tear the stack down with `docker compose down` when finished.
 
 The compose stack launches the API, UI, and an nginx reverse proxy. nginx terminates basic auth, forwards `/api/*` and `/hubs/*` to the API with WebSocket upgrades for SignalR, and serves the built SPA for everything else using the config in `docker/nginx-proxy.conf`.
+
+#### Authentication Setup
+
+The Docker deployment uses HTTP Basic Authentication for security. To regenerate the password file:
+
+```powershell
+cd docker
+./generate-htpasswd.bat [username] [password]
+```
+
+If no parameters are provided, defaults to `admin` and `textprocessor2025`. After regenerating, restart the nginx container:
+
+```powershell
+docker compose restart nginx
+```
 
 The React build baked into the image uses `.env.production` so browser calls stay on the proxy origin (`/api` and `/hubs/processing`). Local development keeps targeting the Kestrel port via `.env.development`.
 

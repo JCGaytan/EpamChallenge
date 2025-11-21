@@ -177,6 +177,8 @@ export function useTextProcessing(): UseTextProcessingResult {
         setProcessedResult(prev => prev + event.character);
         setProgress(event.progress);
       }
+      // Log all job events for debugging concurrent jobs
+      console.log('Character processed for job:', event.jobId, 'character:', event.character);
     },
     onJobCompleted: (event: JobCompletedEvent) => {
       const activeJob = currentJobRef.current;
@@ -191,6 +193,8 @@ export function useTextProcessing(): UseTextProcessingResult {
         setProgress(100);
         setProcessedResult(event.result);
       }
+      // Log all completion events for debugging
+      console.log('Job completed:', event.jobId, 'result length:', event.result.length);
     },
     onJobCancelled: (event: JobCancelledEvent) => {
       const activeJob = currentJobRef.current;
@@ -226,9 +230,10 @@ export function useTextProcessing(): UseTextProcessingResult {
   });
 
   const startProcessing = useCallback(async (text: string) => {
-    if (isProcessing) {
-      throw new Error('A processing job is already running');
-    }
+    // Remove the single job limitation to allow multiple concurrent jobs per tab
+    // if (isProcessing) {
+    //   throw new Error('A processing job is already running in this tab. You can start another process in a new tab or window.');
+    // }
 
     setError(null);
     setProcessedResult('');
@@ -261,7 +266,7 @@ export function useTextProcessing(): UseTextProcessingResult {
       setIsProcessing(false);
       throw error;
     }
-  }, [isProcessing, isConnected, connect, joinJobGroup, connectionId]);
+  }, [isConnected, connect, joinJobGroup, connectionId]);
 
   const cancelProcessing = useCallback(async () => {
     if (!currentJob || !isProcessing) {

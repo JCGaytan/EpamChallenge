@@ -250,6 +250,9 @@ const TextProcessingForm: React.FC = () => {
                 The system analyzes character frequency, sorts them, and appends a Base64 encoding.
                 Each character is streamed to you in real-time with random delays (1-5 seconds).
               </p>
+              <p className="small text-muted mb-0 mt-2">
+                <strong>Note:</strong> Only one process can run per tab/window, but you can open multiple tabs to run processes in parallel.
+              </p>
             </Card.Body>
           </Card>
         </Col>

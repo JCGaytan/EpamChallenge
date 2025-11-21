@@ -11,6 +11,8 @@ type SignalRMockModule = {
     joinJobGroup: jest.Mock<Promise<void>, [string]>;
     leaveJobGroup: jest.Mock<Promise<void>, [string]>;
     cancelJob: jest.Mock<Promise<void>, [string]>;
+    getConnectionId: jest.Mock<string | null, []>;
+    waitForConnectionId: jest.Mock<Promise<string | null>, [number?]>;
   };
 };
 
@@ -26,6 +28,8 @@ jest.mock('../services/signalr', () => {
   const joinJobGroup = jest.fn();
   const leaveJobGroup = jest.fn();
   const cancelJob = jest.fn();
+  const getConnectionId = jest.fn();
+  const waitForConnectionId = jest.fn();
 
   return {
     __esModule: true,
@@ -34,14 +38,18 @@ jest.mock('../services/signalr', () => {
       disconnect,
       joinJobGroup,
       leaveJobGroup,
-      cancelJob
+      cancelJob,
+      getConnectionId,
+      waitForConnectionId
     },
     __mock: {
       connect,
       disconnect,
       joinJobGroup,
       leaveJobGroup,
-      cancelJob
+      cancelJob,
+      getConnectionId,
+      waitForConnectionId
     }
   };
 });
@@ -68,6 +76,8 @@ const mockDisconnect = signalRModule.__mock.disconnect;
 const mockJoinJobGroup = signalRModule.__mock.joinJobGroup;
 const mockLeaveJobGroup = signalRModule.__mock.leaveJobGroup;
 const mockCancelJob = signalRModule.__mock.cancelJob;
+const mockGetConnectionId = signalRModule.__mock.getConnectionId;
+const mockWaitForConnectionId = signalRModule.__mock.waitForConnectionId;
 const mockProcessText = apiModule.__mock.processText;
 
 const TestHarness: React.FC<{ onChange: (value: UseTextProcessingResult) => void }> = ({ onChange }) => {
@@ -100,6 +110,9 @@ describe('useTextProcessing', () => {
     mockLeaveJobGroup.mockResolvedValue(undefined);
     mockCancelJob.mockResolvedValue(undefined);
 
+    mockGetConnectionId.mockReturnValue('test-connection-id');
+    mockWaitForConnectionId.mockResolvedValue('test-connection-id');
+
     mockProcessText.mockResolvedValue({
       id: 'job-1',
       inputText: 'Hello',
@@ -122,7 +135,7 @@ describe('useTextProcessing', () => {
     });
 
     expect(mockConnect).toHaveBeenCalledTimes(1);
-    expect(mockProcessText).toHaveBeenCalledWith({ text: 'Hello' });
+    expect(mockProcessText).toHaveBeenCalledWith({ text: 'Hello' }, 'test-connection-id');
     await waitFor(() => expect(latest.current?.currentJob?.id).toBe('job-1'));
     expect(mockJoinJobGroup).toHaveBeenCalledWith('job-1');
     expect(latest.current?.isProcessing).toBe(true);
@@ -181,5 +194,101 @@ describe('useTextProcessing', () => {
     expect(latest.current?.processedResult).toBe('');
     expect(latest.current?.isProcessing).toBe(false);
     expect(mockLeaveJobGroup).toHaveBeenCalledWith('job-1');
+  });
+
+  it('prevents multiple concurrent processes in the same tab', async () => {
+    await mountHook();
+
+    // Start first process
+    await act(async () => {
+      await latest.current!.startProcessing('Hello');
+    });
+
+    await waitFor(() => expect(latest.current?.isProcessing).toBe(true));
+
+    // Try to start second process while first is running
+    await expect(async () => {
+      await act(async () => {
+        await latest.current!.startProcessing('World');
+      });
+    }).rejects.toThrow('A processing job is already running in this tab. You can start another process in a new tab or window.');
+
+    expect(mockProcessText).toHaveBeenCalledTimes(1); // Only called once
+  });
+
+  it('allows new process after previous one is completed', async () => {
+    await mountHook();
+
+    // Start first process
+    await act(async () => {
+      await latest.current!.startProcessing('Hello');
+    });
+
+    await waitFor(() => expect(latest.current?.isProcessing).toBe(true));
+
+    // Complete the job
+    act(() => {
+      registeredCallbacks?.onJobCompleted?.({
+        jobId: 'job-1',
+        result: 'Hello/SGVsbG8=',
+        completedAt: new Date().toISOString(),
+        duration: '00:00:01'
+      });
+    });
+
+    await waitFor(() => expect(latest.current?.isProcessing).toBe(false));
+
+    // Now should be able to start a new process
+    mockProcessText.mockResolvedValue({
+      id: 'job-2',
+      inputText: 'World',
+      status: JobStatus.Running,
+      progress: 0,
+      createdAt: new Date().toISOString()
+    });
+
+    await act(async () => {
+      await latest.current!.startProcessing('World');
+    });
+
+    await waitFor(() => expect(latest.current?.currentJob?.id).toBe('job-2'));
+    expect(mockProcessText).toHaveBeenCalledTimes(2);
+  });
+
+  it('allows new process after previous one is cancelled', async () => {
+    await mountHook();
+
+    // Start first process
+    await act(async () => {
+      await latest.current!.startProcessing('Hello');
+    });
+
+    await waitFor(() => expect(latest.current?.isProcessing).toBe(true));
+
+    // Cancel the job
+    act(() => {
+      registeredCallbacks?.onJobCancelled?.({
+        jobId: 'job-1',
+        cancelledAt: new Date().toISOString()
+      });
+    });
+
+    await waitFor(() => expect(latest.current?.isProcessing).toBe(false));
+
+    // Now should be able to start a new process
+    mockProcessText.mockResolvedValue({
+      id: 'job-2',
+      inputText: 'World',
+      status: JobStatus.Running,
+      progress: 0,
+      createdAt: new Date().toISOString()
+    });
+
+    await act(async () => {
+      await latest.current!.startProcessing('World');
+    });
+
+    await waitFor(() => expect(latest.current?.currentJob?.id).toBe('job-2'));
+    expect(mockProcessText).toHaveBeenCalledTimes(2);
   });
 });

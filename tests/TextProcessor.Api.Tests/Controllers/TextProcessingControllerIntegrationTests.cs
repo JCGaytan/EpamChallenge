@@ -195,6 +195,102 @@ public class TextProcessingControllerIntegrationTests : IClassFixture<CustomWebA
         responseContent.Should().Contain("OK");
     }
 
+    [Fact]
+    public async Task ProcessText_MultipleClients_CanRunConcurrently()
+    {
+        // Arrange - Create requests for different clients
+        var client1Id = Guid.NewGuid().ToString();
+        var client2Id = Guid.NewGuid().ToString();
+        
+        var request1 = new HttpRequestMessage(HttpMethod.Post, "/api/textprocessing/process")
+        {
+            Content = JsonContent.Create(new ProcessTextRequest { Text = "Client 1 text" })
+        };
+        request1.Headers.Add("X-SignalR-ConnectionId", client1Id);
+
+        var request2 = new HttpRequestMessage(HttpMethod.Post, "/api/textprocessing/process")
+        {
+            Content = JsonContent.Create(new ProcessTextRequest { Text = "Client 2 text" })
+        };
+        request2.Headers.Add("X-SignalR-ConnectionId", client2Id);
+
+        // Act - Start both processes simultaneously
+        var response1Task = _client.SendAsync(request1);
+        var response2Task = _client.SendAsync(request2);
+
+        var responses = await Task.WhenAll(response1Task, response2Task);
+
+        // Assert - Both should succeed
+        responses[0].StatusCode.Should().Be(HttpStatusCode.Created);
+        responses[1].StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var job1 = await DeserializeAsync<ProcessingJobDto>(responses[0]);
+        var job2 = await DeserializeAsync<ProcessingJobDto>(responses[1]);
+
+        job1.Should().NotBeNull();
+        job2.Should().NotBeNull();
+        job1!.Id.Should().NotBe(job2!.Id); // Different job IDs
+        job1.InputText.Should().Be("Client 1 text");
+        job2.InputText.Should().Be("Client 2 text");
+    }
+
+    [Fact]
+    public async Task GetJobs_DifferentClients_OnlyReturnsOwnJobs()
+    {
+        // Arrange - Create jobs for different clients
+        var client1Id = Guid.NewGuid().ToString();
+        var client2Id = Guid.NewGuid().ToString();
+        
+        // Create job for client 1
+        var request1 = new HttpRequestMessage(HttpMethod.Post, "/api/textprocessing/process")
+        {
+            Content = JsonContent.Create(new ProcessTextRequest { Text = "Client 1 job" })
+        };
+        request1.Headers.Add("X-SignalR-ConnectionId", client1Id);
+        
+        var createResponse1 = await _client.SendAsync(request1);
+        createResponse1.StatusCode.Should().Be(HttpStatusCode.Created);
+        var job1 = await DeserializeAsync<ProcessingJobDto>(createResponse1);
+
+        // Create job for client 2
+        var request2 = new HttpRequestMessage(HttpMethod.Post, "/api/textprocessing/process")
+        {
+            Content = JsonContent.Create(new ProcessTextRequest { Text = "Client 2 job" })
+        };
+        request2.Headers.Add("X-SignalR-ConnectionId", client2Id);
+        
+        var createResponse2 = await _client.SendAsync(request2);
+        createResponse2.StatusCode.Should().Be(HttpStatusCode.Created);
+        var job2 = await DeserializeAsync<ProcessingJobDto>(createResponse2);
+
+        // Act - Get jobs for each client
+        var getJobsRequest1 = new HttpRequestMessage(HttpMethod.Get, "/api/textprocessing/jobs");
+        getJobsRequest1.Headers.Add("X-SignalR-ConnectionId", client1Id);
+        var jobsResponse1 = await _client.SendAsync(getJobsRequest1);
+        
+        var getJobsRequest2 = new HttpRequestMessage(HttpMethod.Get, "/api/textprocessing/jobs");
+        getJobsRequest2.Headers.Add("X-SignalR-ConnectionId", client2Id);
+        var jobsResponse2 = await _client.SendAsync(getJobsRequest2);
+
+        // Assert
+        jobsResponse1.StatusCode.Should().Be(HttpStatusCode.OK);
+        jobsResponse2.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var jobs1 = await DeserializeAsync<ProcessingJobDto[]>(jobsResponse1);
+        var jobs2 = await DeserializeAsync<ProcessingJobDto[]>(jobsResponse2);
+
+        jobs1.Should().NotBeNull();
+        jobs2.Should().NotBeNull();
+
+        // Each client should see their own job
+        jobs1!.Should().Contain(j => j.Id == job1!.Id);
+        jobs2!.Should().Contain(j => j.Id == job2!.Id);
+
+        // Each client should NOT see the other's job
+        jobs1.Should().NotContain(j => j.Id == job2!.Id);
+        jobs2.Should().NotContain(j => j.Id == job1!.Id);
+    }
+
     private async Task<ProcessingJobDto> WaitForJobStatusAsync(Guid jobId, string expectedStatus, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow.Add(timeout);

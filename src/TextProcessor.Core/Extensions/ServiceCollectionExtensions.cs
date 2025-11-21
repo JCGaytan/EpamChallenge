@@ -16,8 +16,8 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddTextProcessingCore(this IServiceCollection services)
     {
-        // Register core services
-        services.AddScoped<ITextProcessingService, TextProcessingService>();
+        // Register core services - use Transient for TextProcessingService to ensure each job gets its own instance
+        services.AddTransient<ITextProcessingService, TextProcessingService>();
         services.AddSingleton<IJobManager, InMemoryJobManager>();
         
         return services;

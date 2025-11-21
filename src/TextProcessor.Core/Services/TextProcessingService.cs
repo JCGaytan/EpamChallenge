@@ -11,12 +11,11 @@ namespace TextProcessor.Core.Services;
 public class TextProcessingService : ITextProcessingService
 {
     private readonly ILogger<TextProcessingService> _logger;
-    private readonly Random _random;
+    private static readonly ThreadLocal<Random> _random = new(() => new Random(Guid.NewGuid().GetHashCode()));
 
     public TextProcessingService(ILogger<TextProcessingService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _random = new Random();
     }
 
     public async Task<ProcessingResult> ProcessTextAsync(
@@ -111,8 +110,8 @@ public class TextProcessingService : ITextProcessingService
         {
             cancellationToken.ThrowIfCancellationRequested();
             
-            // Random delay between 1-5 seconds as specified in requirements
-            var delayMs = _random.Next(1000, 5001);
+            // Random delay between 1-5 seconds as per requirements
+            var delayMs = _random.Value!.Next(1000, 5001);
             
             _logger.LogDebug("Processing character '{Character}' at position {Position} with delay {Delay}ms", 
                 text[i], i, delayMs);

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Threading;
 using TextProcessor.Core.Interfaces;
 using TextProcessor.Core.Models;
 
@@ -43,18 +44,44 @@ public class BackgroundJobService : BackgroundService
     {
         _logger.LogInformation("Background Job Service started");
 
+        var activeTasks = new List<Task>();
+        var maxConcurrentJobs = Environment.ProcessorCount; // Use processor count as default
+        
+        _logger.LogInformation("Background Job Service will process up to {MaxJobs} concurrent jobs", maxConcurrentJobs);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                if (_jobQueue.TryDequeue(out var jobId))
+                // Clean up completed tasks first
+                var completedTasks = activeTasks.Where(t => t.IsCompleted).ToList();
+                foreach (var completedTask in completedTasks)
                 {
-                    await ProcessJobAsync(jobId, stoppingToken);
+                    activeTasks.Remove(completedTask);
+                    _logger.LogDebug("Removed completed task. Remaining active jobs: {ActiveCount}/{MaxJobs}", 
+                        activeTasks.Count, maxConcurrentJobs);
+                }
+
+                // Start new jobs while we have capacity
+                while (activeTasks.Count < maxConcurrentJobs && _jobQueue.TryDequeue(out var jobId))
+                {
+                    var task = ProcessJobAsync(jobId, stoppingToken);
+                    activeTasks.Add(task);
+                    _logger.LogInformation("Started concurrent processing for job {JobId}. Active jobs: {ActiveCount}/{MaxJobs}", 
+                        jobId, activeTasks.Count, maxConcurrentJobs);
+                }
+
+                if (activeTasks.Count == 0)
+                {
+                    // No active jobs, wait a bit before checking again
+                    await Task.Delay(50, stoppingToken); // Reduced delay for faster response
                 }
                 else
                 {
-                    // Wait a bit if no jobs are available
-                    await Task.Delay(100, stoppingToken);
+                    // Wait for any task to complete or new jobs to arrive, but with a short timeout
+                    var delayTask = Task.Delay(50, stoppingToken);
+                    var completionTask = Task.WhenAny(activeTasks);
+                    await Task.WhenAny(delayTask, completionTask);
                 }
             }
             catch (OperationCanceledException)
@@ -67,6 +94,13 @@ public class BackgroundJobService : BackgroundService
                 _logger.LogError(ex, "Error in background job processing loop");
                 await Task.Delay(1000, stoppingToken); // Wait before retrying
             }
+        }
+
+        // Wait for all active jobs to complete before shutting down
+        if (activeTasks.Count > 0)
+        {
+            _logger.LogInformation("Waiting for {ActiveCount} active jobs to complete during shutdown", activeTasks.Count);
+            await Task.WhenAll(activeTasks);
         }
 
         _logger.LogInformation("Background Job Service stopped");
@@ -85,7 +119,7 @@ public class BackgroundJobService : BackgroundService
 
         try
         {
-            _logger.LogInformation("Starting background processing for job {JobId}", jobId);
+            _logger.LogInformation("Starting background processing for job {JobId} (Thread: {ThreadId})", jobId, Thread.CurrentThread.ManagedThreadId);
 
             job = await jobManager.GetJobAsync(jobId);
             if (job == null)
@@ -138,7 +172,7 @@ public class BackgroundJobService : BackgroundService
             await notificationService.NotifyJobCompletedAsync(
                 job.ClientId ?? string.Empty, job);
 
-            _logger.LogInformation("Successfully completed processing for job {JobId}", jobId);
+            _logger.LogInformation("Successfully completed processing for job {JobId} (Thread: {ThreadId})", jobId, Thread.CurrentThread.ManagedThreadId);
         }
         catch (OperationCanceledException)
         {

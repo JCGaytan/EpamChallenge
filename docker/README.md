@@ -23,17 +23,17 @@ The application consists of three main components:
 1. **Build and start all services:**
    ```bash
    cd docker
-   docker-compose up --build
+   docker compose up --build
    ```
 
 2. **Access the application:**
-   - Application: http://localhost (with basic auth)
-   - API directly: http://localhost:8080
-   - Frontend directly: http://localhost:3000
+   - Application: http://localhost (with basic auth via nginx)
+   - API directly: http://localhost:8080 (bypasses auth)
+   - Frontend directly: http://localhost:3000 (bypasses auth)
 
 3. **Default credentials:**
    - Username: `admin`
-   - Password: `textprocessor2024`
+   - Password: `textprocessor2025`
 
 ### Production Setup
 
@@ -53,7 +53,7 @@ The application consists of three main components:
 
 3. **Deploy:**
    ```bash
-   docker-compose up -d --build
+   docker compose up -d --build
    ```
 
 ## Services
@@ -92,7 +92,7 @@ The application consists of three main components:
 
 The Nginx proxy requires basic authentication. Default credentials:
 - **Username:** admin
-- **Password:** textprocessor2024
+- **Password:** textprocessor2025
 
 To change credentials:
 1. Generate new htpasswd file using the provided scripts
@@ -134,23 +134,23 @@ All services include health check endpoints:
 View logs for specific services:
 ```bash
 # API logs
-docker-compose logs -f api
+docker compose logs -f api
 
 # UI logs
-docker-compose logs -f ui
+docker compose logs -f ui
 
 # Nginx logs
-docker-compose logs -f nginx
+docker compose logs -f nginx
 
 # All services
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### Container Status
 
 Check container health:
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ## Development
@@ -211,12 +211,20 @@ For development with hot reload:
    docker-compose logs [service-name]
    ```
 
-3. **SignalR connection issues:**
+3. **Authentication issues:**
+   - Verify htpasswd file has no BOM (Byte Order Mark)
+   - Check credentials: username `admin`, password `textprocessor2025`
+   - Regenerate htpasswd file if authentication fails: `./generate-htpasswd.bat`
+   - Restart nginx container after credential changes: `docker compose restart nginx`
+   - **Note**: Windows PowerShell can add UTF-8 BOM causing nginx authentication to fail
+
+4. **SignalR connection issues:**
    - Ensure WebSocket support is enabled in Nginx
    - Check CORS configuration
    - Verify authentication headers
 
-4. **Health check failures:**
+5. **Health check failures:**
+
    ```bash
    # Test health endpoints manually
    curl http://localhost/health
@@ -245,7 +253,7 @@ For development with hot reload:
 
 To scale the API service:
 ```bash
-docker-compose up --scale api=3
+docker compose up --scale api=3
 ```
 
 Note: You'll need to configure Nginx load balancing and shared state storage (Redis) for proper scaling.
